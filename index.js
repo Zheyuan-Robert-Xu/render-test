@@ -65,10 +65,6 @@ app.use(
 
 // app.use(unknownEndpoint);
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
 app.get("/api/persons/:id", (request, response) => {
   const id = Number(request.params.id); // id should be interget not string
   const person = persons.find((p) => {
@@ -132,3 +128,8 @@ const errorHandler = (error, request, response, next) => {
 };
 
 app.use(errorHandler);
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

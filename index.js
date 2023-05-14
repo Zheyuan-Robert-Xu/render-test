@@ -2,119 +2,22 @@ const express = require("express");
 const app = express();
 var morgan = require("morgan");
 const cors = require("cors");
+require("dotenv").config();
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static("build"));
-// app.use(morgan("tiny")); // is somewhat duplicated with the following code
+const Person = require("./models/person");
 
-let persons = [
-  {
-    id: 1,
-    name: "Arto Hellas",
-    number: "040-123456",
-  },
-  {
-    id: 2,
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-  },
-  {
-    id: 3,
-    name: "Dan Abramov",
-    number: "12-43-234345",
-  },
-  {
-    id: 4,
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-  },
-];
-app.get("/", (request, response) => {
-  response.send("<h1>Hello World!</h1>");
-});
-app.get("/api/persons", (request, response) => {
-  response.json(persons);
-});
-app.get("/info", (request, response) => {
-  var numPerson = persons.length;
-  var date = new Date();
-  response.send(
-    `<div><p>Phonebook has info for ${numPerson} people</p><p>${date}</p></div>`
-  );
-});
-
-app.use(
-  morgan((tokens, req, res) => {
-    return [
-      tokens.method(req, res),
-      tokens.url(req, res),
-      tokens.status(req, res),
-      tokens.res(req, res, "content-length"),
-      "-",
-      tokens["response-time"](req, res),
-      "ms",
-      JSON.stringify(req.body), //{"name":"Greate Robert","number":"058-2749539"}
-    ].join(" ");
-  })
-);
-
-// const unknownEndpoint = (req, res) => {
-//   res.status(404).send({ error: "unknown endpoint" });
-// };
-
-// app.use(unknownEndpoint);
-
-app.get("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id); // id should be interget not string
-  const person = persons.find((p) => {
-    return p.id === id;
-  });
-  if (person) {
-    response.json(person);
-  } else {
-    response.status(404).end();
-  }
-});
-app.delete("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  persons = persons.filter((p) => p.id !== id);
-
-  response.status(204).end();
-});
-const generateId = () => {
-  const maxId = persons.length > 0 ? Math.max(...persons.map((p) => p.id)) : 0;
-  return maxId + 1;
+const requestLogger = (request, response, next) => {
+  console.log("Method:", request.method);
+  console.log("Path:  ", request.path);
+  console.log("Body:  ", request.body);
+  console.log("---");
+  next();
 };
-app.post("/api/persons", (request, response) => {
-  const body = request.body;
 
-  if (!body.name) {
-    return response.status(400).json({
-      error: "name missing",
-    });
-  }
-  if (!body.number) {
-    return response.status(400).json({
-      error: "number missing",
-    });
-  }
-  if (persons.some((e) => e.name === body.name)) {
-    return response.status(400).json({
-      error: "name must be unique",
-    });
-  }
-
-  const person = {
-    id: generateId(),
-    number: body.number,
-    name: body.name,
-  };
-  persons = persons.concat(person);
-  response.json(person); // takes a Response stream and reads it to completion.
-  // it returns a promise which resolves with the result of parsing the body text as JSON
-  // the result is not JSON but is instead the result of taking JSON as input and parsing it to produce a JavaScript object
-});
+const isPhoneNumberValid = (phoneNumber) => {
+  const phoneNumberRegex = /^\d{2,3}-\d{6,}$/;
+  return phoneNumberRegex.test(phoneNumber);
+};
 
 const errorHandler = (error, request, response, next) => {
   console.error(error.message);
@@ -127,9 +30,144 @@ const errorHandler = (error, request, response, next) => {
   next(error);
 };
 
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: "unknown endpoint" });
+};
+
+app.use(cors());
+app.use(express.json());
+app.use(requestLogger);
+app.use(express.static("build"));
+// app.use(morgan("tiny")); // is somewhat duplicated with the following code
+
+let persons = [];
+
+app.get("/api/persons", (request, response) => {
+  Person.find({}).then((persons) => {
+    response.json(persons);
+  });
+});
+
+app.get("/info", (request, response) => {
+  Person.find({}).then((persons) => {
+    var numPerson = persons.length;
+    var date = new Date();
+    response.send(
+      `<div><p>PhoneBook has info for ${numPerson} people</p><p>${date}</p></div>`
+    );
+  });
+});
+
+app.put("/api/persons/:id", (request, response, next) => {
+  const { name, number } = request.body;
+
+  const person = {
+    name: body.name,
+    number: body.number,
+  };
+
+  // Which will cause our event handler to be called with the new modified document
+  // instead of the original.
+  Person.findByIdAndUpdate(
+    request.params.id,
+    { name, number },
+    { new: true, runValidators: true, context: "query" }
+  )
+    .then((updatedPerson) => {
+      response.json(updatedPerson);
+    })
+    .catch((error) => next(error));
+});
+
+app.use(
+  morgan((tokens, req, res) => {
+    return [
+      tokens.method(req, res),
+      tokens.url(req, res),
+      tokens.status(req, res),
+      tokens.res(req, res, "content-length"),
+      "-",
+      tokens["response-time"](req, res),
+      "ms",
+      JSON.stringify(req.body), //{"name":"Great Robert","number":"058-2749539"}
+    ].join(" ");
+  })
+);
+
+// const unknownEndpoint = (req, res) => {
+//   res.status(404).send({ error: "unknown endpoint" });
+// };
+
+// app.use(unknownEndpoint);
+
+app.get("/api/persons/:id", (request, response) => {
+  Person.findById(request.params.id)
+    .then((person) => {
+      response.json(person);
+    })
+    .catch((error) => next(error));
+});
+
+app.delete("/api/persons/:id", (request, response, next) => {
+  Person.findByIdAndRemove(request.params.id)
+    .then((result) => {
+      response.status(204).end();
+    })
+    .catch((error) => next(error));
+});
+
+app.post("/api/persons", (request, response, next) => {
+  const body = request.body;
+
+  if (!body.name) {
+    return response.status(400).json({
+      error: "name missing",
+    });
+  }
+  if (!body.number) {
+    return response.status(400).json({
+      error: "number missing",
+    });
+  }
+  if (!isPhoneNumberValid(body.number)) {
+    return response.status(400).json({
+      error:
+        "Invalid phone number. Phone number must have a length of 8 or more and be in the format XX-XXXXXXX.",
+    });
+  }
+  Person.findOne({ name: body.name })
+    .then((existingPerson) => {
+      if (existingPerson) {
+        // Person already exists, update the phone number
+        existingPerson.number = body.number;
+        existingPerson
+          .save()
+          .then((updatedPerson) => {
+            response.json(updatedPerson);
+          })
+          .catch((error) => next(error));
+      } else {
+        // Person does not exist, create a new entry
+        const person = new Person({
+          name: body.name,
+          number: body.number,
+        });
+
+        person
+          .save()
+          .then((savedPerson) => {
+            response.json(savedPerson);
+          })
+          .catch((error) => next(error));
+      }
+    })
+    .catch((error) => next(error));
+});
+
+app.use(unknownEndpoint);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

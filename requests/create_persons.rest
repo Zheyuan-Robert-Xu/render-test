@@ -5,8 +5,8 @@ POST http://localhost:3001/api/persons/ HTTP/1.1
 content-type: application/json
 
 {
-    "name":"Greate Robert",
-    "number": "058-2749539"
+    "name":"Hinon Bnomo",
+    "number": "89-2749539"
 }
 ###
 DELETE http://localhost:3001/api/persons/5
